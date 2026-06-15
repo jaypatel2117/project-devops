@@ -1,0 +1,33 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+errored.tfstate
+terraform.tfvars
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Node
+node_modules/
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+app/frontend/build/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+.agents/
+skills-lock.json

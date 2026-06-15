@@ -1,0 +1,71 @@
+{
+  "family": "TASK_FAMILY_PLACEHOLDER",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "EXECUTION_ROLE_ARN_PLACEHOLDER",
+  "taskRoleArn": "TASK_ROLE_ARN_PLACEHOLDER",
+  "containerDefinitions": [
+    {
+      "name": "frontend",
+      "image": "IMAGE_NAME_FRONTEND",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 80, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "REACT_APP_API_URL", "value": "/api" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/CLUSTER_NAME_PLACEHOLDER/frontend",
+          "awslogs-region": "ca-central-1",
+          "awslogs-stream-prefix": "frontend"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 10
+      }
+    },
+    {
+      "name": "backend",
+      "image": "IMAGE_NAME_BACKEND",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 3001, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "PORT",   "value": "3001" },
+        { "name": "DB_PORT","value": "5432" },
+        { "name": "DB_NAME","value": "retaildb" },
+        { "name": "DB_SSL", "value": "true" }
+      ],
+      "secrets": [
+        { "name": "DB_HOST",     "valueFrom": "DB_SECRET_ARN_PLACEHOLDER:host::" },
+        { "name": "DB_USER",     "valueFrom": "DB_SECRET_ARN_PLACEHOLDER:username::" },
+        { "name": "DB_PASSWORD", "valueFrom": "DB_SECRET_ARN_PLACEHOLDER:password::" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/CLUSTER_NAME_PLACEHOLDER/backend",
+          "awslogs-region": "ca-central-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 20
+      }
+    }
+  ]
+}
