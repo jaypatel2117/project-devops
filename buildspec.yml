@@ -21,6 +21,15 @@ phases:
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
       - IMAGE_TAG=${COMMIT_HASH:-latest}
       - echo "Image tag $IMAGE_TAG"
+      - |
+        # Derive cluster/service names from the ECR repo URL
+        # FRONTEND_REPO = ACCOUNT.dkr.ecr.REGION.amazonaws.com/retail-dev/frontend
+        NAME_PREFIX=$(echo $FRONTEND_REPO | awk -F'/' '{print $(NF-1)}')
+        CLUSTER_NAME="${NAME_PREFIX}-cluster"
+        SERVICE_NAME="${NAME_PREFIX}-service"
+        echo "Cluster: $CLUSTER_NAME  Service: $SERVICE_NAME"
+        echo "export CLUSTER_NAME=${CLUSTER_NAME}" >> /tmp/env_vars
+        echo "export SERVICE_NAME=${SERVICE_NAME}" >> /tmp/env_vars
 
   build:
     commands:
@@ -40,6 +49,31 @@ phases:
       - docker push $BACKEND_REPO:$IMAGE_TAG
       - docker push $BACKEND_REPO:latest
 
+      - source /tmp/env_vars
+      - echo "Fetching current task definition from ECS service..."
+      - |
+        TASK_DEF_ARN=$(aws ecs describe-services \
+          --cluster $CLUSTER_NAME \
+          --services $SERVICE_NAME \
+          --region $AWS_DEFAULT_REGION \
+          --query 'services[0].taskDefinition' \
+          --output text)
+        echo "Current task def: $TASK_DEF_ARN"
+        aws ecs describe-task-definition \
+          --task-definition $TASK_DEF_ARN \
+          --region $AWS_DEFAULT_REGION \
+          --query 'taskDefinition' \
+          | jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy)' \
+          > base-taskdef.json
+
+      - echo "Updating image URIs in task definition..."
+      - |
+        jq --arg fe "${FRONTEND_REPO}:${IMAGE_TAG}" \
+           --arg be "${BACKEND_REPO}:${IMAGE_TAG}" \
+           '(.containerDefinitions[] | select(.name=="frontend") | .image) |= $fe |
+            (.containerDefinitions[] | select(.name=="backend")  | .image) |= $be' \
+           base-taskdef.json > taskdef.json
+
       - echo "Writing imagedefinitions.json..."
       - |
         cat > imagedefinitions.json <<EOF
@@ -48,12 +82,6 @@ phases:
           {"name":"backend","imageUri":"${BACKEND_REPO}:${IMAGE_TAG}"}
         ]
         EOF
-
-      - echo "Writing taskdef.json..."
-      - |
-        sed -e "s|IMAGE_NAME_FRONTEND|${FRONTEND_REPO}:${IMAGE_TAG}|g" \
-            -e "s|IMAGE_NAME_BACKEND|${BACKEND_REPO}:${IMAGE_TAG}|g" \
-            taskdef-template.json > taskdef.json
 
       - echo "Build complete."
 

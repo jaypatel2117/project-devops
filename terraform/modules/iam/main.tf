@@ -112,6 +112,11 @@ resource "aws_iam_role_policy" "codebuild_policy" {
         Effect   = "Allow"
         Action   = ["codebuild:CreateReportGroup", "codebuild:CreateReport", "codebuild:UpdateReport", "codebuild:BatchPutTestCases"]
         Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ecs:DescribeServices", "ecs:DescribeTaskDefinition"]
+        Resource = "*"
       }
     ]
   })
