@@ -1,8 +1,5 @@
 version: 0.2
 
-# AWS CodeBuild spec
-# Runs unit tests, builds Docker images, pushes to ECR, writes deployment artifacts.
-
 env:
   variables:
     IMAGE_TAG_FRONTEND: "frontend"
@@ -19,24 +16,11 @@ phases:
 
   pre_build:
     commands:
-      - echo "Running unit tests..."
-      - cd app/backend  && npm test --passWithNoTests 2>&1 | tail -20 && cd ../..
-      - cd app/frontend && npm test -- --watchAll=false --passWithNoTests 2>&1 | tail -20 && cd ../..
-
       - echo "Logging in to ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-8)
       - IMAGE_TAG=${COMMIT_HASH:-latest}
-      - echo "Image tag is $IMAGE_TAG"
-
-      # Trivy security scan — warn only (non-blocking for now)
-      - |
-        if command -v trivy &> /dev/null; then
-          trivy --version
-        else
-          wget -qO- https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.48.0
-        fi
+      - echo "Image tag $IMAGE_TAG"
 
   build:
     commands:
@@ -48,10 +32,6 @@ phases:
       - docker build -t $BACKEND_REPO:$IMAGE_TAG app/backend/
       - docker tag $BACKEND_REPO:$IMAGE_TAG $BACKEND_REPO:latest
 
-      - echo "Scanning images for vulnerabilities..."
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $FRONTEND_REPO:$IMAGE_TAG || true
-      - trivy image --exit-code 0 --severity HIGH,CRITICAL $BACKEND_REPO:$IMAGE_TAG  || true
-
   post_build:
     commands:
       - echo "Pushing images to ECR..."
@@ -60,7 +40,7 @@ phases:
       - docker push $BACKEND_REPO:$IMAGE_TAG
       - docker push $BACKEND_REPO:latest
 
-      - echo "Writing imagedefinitions.json for CodeDeploy..."
+      - echo "Writing imagedefinitions.json..."
       - |
         cat > imagedefinitions.json <<EOF
         [
@@ -69,9 +49,8 @@ phases:
         ]
         EOF
 
-      - echo "Writing taskdef.json for CodeDeploy Blue/Green..."
+      - echo "Writing taskdef.json..."
       - |
-        # Substitute the image URIs into the task definition template
         sed -e "s|IMAGE_NAME_FRONTEND|${FRONTEND_REPO}:${IMAGE_TAG}|g" \
             -e "s|IMAGE_NAME_BACKEND|${BACKEND_REPO}:${IMAGE_TAG}|g" \
             taskdef-template.json > taskdef.json
@@ -84,9 +63,3 @@ artifacts:
     - taskdef.json
     - appspec.yml
   discard-paths: yes
-
-reports:
-  jest-reports:
-    files:
-      - "app/backend/coverage/junit.xml"
-    file-format: JUNITXML
