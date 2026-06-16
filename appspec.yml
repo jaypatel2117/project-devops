@@ -8,11 +8,3 @@ Resources:
           ContainerName: "frontend"
           ContainerPort: 80
         PlatformVersion: "LATEST"
-        NetworkConfiguration:
-          AwsvpcConfiguration:
-            Subnets:
-              - <SUBNET_1>
-              - <SUBNET_2>
-            SecurityGroups:
-              - <ECS_SECURITY_GROUP>
-            AssignPublicIp: DISABLED
