@@ -142,7 +142,7 @@ resource "aws_ecs_service" "app" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition, load_balancer]
+    ignore_changes = [task_definition, load_balancer, platform_version]
   }
 
   tags = var.tags
